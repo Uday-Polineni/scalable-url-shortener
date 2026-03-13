@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>URL Shortener</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #020617;
+            color: #e5e7eb;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .shell {
+            max-width: 800px;
+            width: 100%;
+            padding: 32px 24px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        h1 {
+            margin: 0;
+            font-size: 1.6rem;
+        }
+        .apikey {
+            font-size: 0.8rem;
+            color: #9ca3af;
+        }
+        .card {
+            background: #020617;
+            border-radius: 12px;
+            border: 1px solid #1f2937;
+            padding: 20px 18px;
+            margin-bottom: 16px;
+        }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.85rem;
+            color: #d1d5db;
+        }
+        input {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid #374151;
+            background: #020617;
+            color: #e5e7eb;
+            font-size: 0.95rem;
+            box-sizing: border-box;
+        }
+        input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 1px #3b82f6;
+        }
+        button {
+            margin-top: 12px;
+            padding: 9px 14px;
+            border-radius: 8px;
+            border: none;
+            background: linear-gradient(to right, #3b82f6, #06b6d4);
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        button:hover {
+            filter: brightness(1.05);
+        }
+        .row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .result {
+            margin-top: 8px;
+            font-size: 0.9rem;
+        }
+        .result a {
+            color: #38bdf8;
+            text-decoration: none;
+        }
+        .result a:hover {
+            text-decoration: underline;
+        }
+        .error {
+            margin-top: 6px;
+            color: #f97316;
+            font-size: 0.85rem;
+        }
+        .help {
+            margin-top: 6px;
+            font-size: 0.8rem;
+            color: #9ca3af;
+        }
+    </style>
+</head>
+<body>
+<div class="shell">
+    <div class="header">
+        <div>
+            <h1>URL Shortener</h1>
+            <div class="help">Create short URLs and test redirects against your running backend.</div>
+        </div>
+        <div class="apikey">
+            <a href="/ui/dashboard.html" style="color:#3b82f6;text-decoration:none;margin-right:12px;">Dashboard</a>
+            <a href="/logout" style="color:#3b82f6;text-decoration:none;">Log out</a>
+        </div>
+    </div>
+
+    <div class="card">
+        <label for="longUrl">Long URL</label>
+        <input id="longUrl" type="url" placeholder="https://example.com/very/long/path">
+        <label for="customAlias" style="margin-top:12px;">Custom alias (optional)</label>
+        <input id="customAlias" type="text" placeholder="e.g. myprofile123">
+        <div class="row">
+            <button type="button" onclick="shorten()">Shorten</button>
+        </div>
+        <div id="shortenError" class="error" style="display:none;"></div>
+        <div id="shortenResult" class="result"></div>
+    </div>
+
+    <div class="card">
+        <label for="shortUrl">Short URL (optional)</label>
+        <input id="shortUrl" type="text" placeholder="Paste a short URL to open in a new tab">
+        <div class="row">
+            <button type="button" onclick="openShort()">Open short URL</button>
+        </div>
+        <div class="help">
+            This simply opens the URL in a new tab so your backend can handle the 302 redirect.
+        </div>
+    </div>
+</div>
+
+<script>
+    async function shorten() {
+        const longUrlInput = document.getElementById('longUrl');
+        const customAliasInput = document.getElementById('customAlias');
+        const error = document.getElementById('shortenError');
+        const result = document.getElementById('shortenResult');
+
+        error.style.display = 'none';
+        result.textContent = '';
+
+        const longUrl = (longUrlInput.value || '').trim();
+        const customAlias = (customAliasInput.value || '').trim();
+
+        if (!longUrl) {
+            error.textContent = 'Please enter a URL to shorten.';
+            error.style.display = 'block';
+            return;
+        }
+
+        try {
+            const body = customAlias ? { longUrl, customAlias } : { longUrl };
+
+            const response = await fetch('/shorten', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(body)
+            });
+
+            if (!response.ok) {
+                const body = await response.json().catch(() => null);
+                const message = body && body.error ? body.error : 'Failed to shorten URL.';
+                error.textContent = message;
+                error.style.display = 'block';
+                return;
+            }
+
+            const data = await response.json();
+            if (!data.shortUrl) {
+                error.textContent = 'Unexpected response from server.';
+                error.style.display = 'block';
+                return;
+            }
+
+            result.innerHTML = 'Short URL: <a href="' + data.shortUrl + '" target="_blank" rel="noopener noreferrer">' +
+                data.shortUrl + '</a>';
+            document.getElementById('shortUrl').value = data.shortUrl;
+        } catch (e) {
+            error.textContent = 'Network error while calling backend.';
+            error.style.display = 'block';
+        }
+    }
+
+    function openShort() {
+        const value = (document.getElementById('shortUrl').value || '').trim();
+        if (!value) {
+            return;
+        }
+        const url = value.startsWith('http://') || value.startsWith('https://')
+            ? value
+            : window.location.origin.replace(/\/$/, '') + '/' + value.replace(/^\//, '');
+        window.open(url, '_blank', 'noopener,noreferrer');
+    }
+
+</script>
+</body>
+</html>
+

@@ -1,0 +1,3 @@
+ALTER TABLE urls
+    ALTER COLUMN code DROP NOT NULL;
+

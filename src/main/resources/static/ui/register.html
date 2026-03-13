@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Sign Up - URL Shortener</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #0f172a;
+            color: #e5e7eb;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .card {
+            background: #020617;
+            border-radius: 12px;
+            border: 1px solid #1f2937;
+            padding: 32px 28px;
+            max-width: 380px;
+            width: 100%;
+            box-shadow: 0 24px 60px rgba(15,23,42,0.8);
+        }
+        h1 { margin: 0 0 8px; font-size: 1.5rem; }
+        p { margin: 0 0 24px; color: #9ca3af; font-size: 0.9rem; }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.85rem;
+            color: #d1d5db;
+        }
+        input {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid #374151;
+            background: #020617;
+            color: #e5e7eb;
+            font-size: 0.95rem;
+            box-sizing: border-box;
+        }
+        input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 1px #3b82f6;
+        }
+        button {
+            margin-top: 16px;
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: none;
+            background: linear-gradient(to right, #3b82f6, #06b6d4);
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.95rem;
+        }
+        button:hover { filter: brightness(1.05); }
+        .hint {
+            margin-top: 12px;
+            font-size: 0.8rem;
+            color: #9ca3af;
+        }
+        .hint a { color: #3b82f6; text-decoration: none; }
+        .hint a:hover { text-decoration: underline; }
+        .error {
+            margin-top: 8px;
+            font-size: 0.85rem;
+            color: #f97316;
+            display: none;
+        }
+        .success {
+            margin-top: 8px;
+            font-size: 0.85rem;
+            color: #22c55e;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1>Create an account</h1>
+    <p>Sign up to start creating and tracking short URLs.</p>
+
+    <form id="registerForm" onsubmit="return register(event)">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required>
+
+        <label for="name" style="margin-top:12px;">Name</label>
+        <input id="name" name="name" type="text" autocomplete="name" placeholder="Your name" minlength="3" maxlength="100" required>
+
+        <label for="password" style="margin-top:12px;">Password</label>
+        <input id="password" name="password" type="password" autocomplete="new-password" placeholder="At least 8 characters" minlength="8" maxlength="100" required>
+
+        <button type="submit">Sign up</button>
+    </form>
+
+    <div id="error" class="error"></div>
+    <div id="success" class="success"></div>
+
+    <div class="hint">
+        Already have an account? <a href="/ui/login.html">Log in</a>.
+    </div>
+</div>
+
+<script>
+    async function register(e) {
+        e.preventDefault();
+        const errorEl = document.getElementById('error');
+        const successEl = document.getElementById('success');
+        errorEl.style.display = 'none';
+        successEl.style.display = 'none';
+
+        const payload = {
+            email: document.getElementById('email').value.trim(),
+            name: document.getElementById('name').value.trim(),
+            password: document.getElementById('password').value
+        };
+
+        try {
+            const res = await fetch('/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+                const body = await res.json().catch(() => null);
+                if (body) {
+                    if (body.error) {
+                        errorEl.textContent = body.error;
+                    } else {
+                        const msgs = Object.entries(body).map(([k, v]) => k + ': ' + v);
+                        errorEl.textContent = msgs.join('; ');
+                    }
+                } else {
+                    errorEl.textContent = 'Registration failed (' + res.status + ')';
+                }
+                errorEl.style.display = 'block';
+                return false;
+            }
+
+            successEl.textContent = 'Account created! Redirecting to login…';
+            successEl.style.display = 'block';
+            setTimeout(() => { window.location.href = '/ui/login.html'; }, 1500);
+        } catch (err) {
+            errorEl.textContent = 'Network error — please try again.';
+            errorEl.style.display = 'block';
+        }
+        return false;
+    }
+</script>
+</body>
+</html>

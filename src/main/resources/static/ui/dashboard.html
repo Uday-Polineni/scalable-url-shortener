@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard - URL Shortener</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #020617;
+            color: #e5e7eb;
+            margin: 0;
+            min-height: 100vh;
+        }
+        .shell {
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 28px 18px 44px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+        h1 { margin: 0; font-size: 1.6rem; }
+        .muted { color: #9ca3af; font-size: 0.9rem; }
+        .nav a { color:#3b82f6; text-decoration:none; margin-left: 12px; }
+        .nav a:hover { text-decoration: underline; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 14px;
+        }
+        .card {
+            background: #020617;
+            border-radius: 12px;
+            border: 1px solid #1f2937;
+            padding: 16px 14px;
+        }
+        .metric { font-size: 1.8rem; font-weight: 700; margin-top: 6px; }
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .table th, .table td {
+            border-bottom: 1px solid #111827;
+            padding: 10px 8px;
+            font-size: 0.9rem;
+            text-align: left;
+            vertical-align: top;
+        }
+        .table th { color:#9ca3af; font-weight: 600; }
+        code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+        .pill { display:inline-block; padding:2px 8px; border:1px solid #1f2937; border-radius: 999px; color:#cbd5e1; font-size: 0.8rem; }
+        .error { color:#f97316; margin-top: 10px; display:none; }
+        @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+<div class="shell">
+    <div class="header">
+        <div>
+            <h1>Dashboard</h1>
+            <div id="subtitle" class="muted">Loading your overview…</div>
+        </div>
+        <div class="nav">
+            <a href="/ui/shortener.html">Shortener</a>
+            <a href="/logout">Log out</a>
+        </div>
+    </div>
+
+    <div id="error" class="error"></div>
+
+    <div class="grid">
+        <div class="card">
+            <div class="muted">Total links</div>
+            <div id="totalLinks" class="metric">—</div>
+        </div>
+        <div class="card">
+            <div class="muted">Total clicks</div>
+            <div id="totalClicks" class="metric">—</div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:12px;">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+            <div>
+                <div style="font-weight:700;">Recent links</div>
+                <div class="muted">Your latest 20 shortened URLs.</div>
+            </div>
+            <span id="linksCount" class="pill">—</span>
+        </div>
+
+        <table class="table">
+            <thead>
+            <tr>
+                <th>Code</th>
+                <th>Long URL</th>
+                <th>Clicks</th>
+                <th>Created</th>
+            </tr>
+            </thead>
+            <tbody id="linksBody">
+            <tr><td colspan="4" class="muted">Loading…</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    function showError(msg) {
+        const el = document.getElementById('error');
+        el.textContent = msg;
+        el.style.display = 'block';
+    }
+
+    function fmtDate(value) {
+        if (!value) return '—';
+        const d = new Date(value);
+        if (isNaN(d.getTime())) return String(value);
+        return d.toLocaleString();
+    }
+
+    function checkLoginRedirect(res) {
+        if (res.redirected && res.url && res.url.includes('/login')) {
+            window.location.href = '/ui/login.html';
+            throw new Error('Session expired — redirecting to login.');
+        }
+    }
+
+    async function loadOverview() {
+        const res = await fetch('/me/overview', { headers: { 'Accept': 'application/json' } });
+        checkLoginRedirect(res);
+        if (!res.ok) throw new Error('Failed to load overview (' + res.status + ')');
+        return await res.json();
+    }
+
+    async function loadLinks() {
+        const res = await fetch('/me/links', { headers: { 'Accept': 'application/json' } });
+        checkLoginRedirect(res);
+        if (!res.ok) throw new Error('Failed to load links (' + res.status + ')');
+        return await res.json();
+    }
+
+    (async () => {
+        try {
+            const overview = await loadOverview();
+            document.getElementById('subtitle').textContent = 'Signed in as ' + (overview.email || '—');
+            document.getElementById('totalLinks').textContent = String(overview.totalLinks ?? '—');
+            document.getElementById('totalClicks').textContent = String(overview.totalClicks ?? '—');
+        } catch (e) {
+            showError(e.message || 'Failed to load overview.');
+            document.getElementById('subtitle').textContent = 'Unable to load overview.';
+        }
+
+        try {
+            const links = await loadLinks();
+            document.getElementById('linksCount').textContent = (Array.isArray(links) ? links.length : 0) + ' links';
+            const body = document.getElementById('linksBody');
+            body.innerHTML = '';
+
+            if (!Array.isArray(links) || links.length === 0) {
+                body.innerHTML = '<tr><td colspan="4" class="muted">No links yet. Create one from the Shortener page.</td></tr>';
+                return;
+            }
+
+            for (const row of links) {
+                const code = row.code || '—';
+                const shortUrl = window.location.origin.replace(/\/$/, '') + '/' + String(code).replace(/^\//, '');
+                const tr = document.createElement('tr');
+                tr.innerHTML =
+                    '<td><a href="' + shortUrl + '" target="_blank" rel="noopener noreferrer" style="color:#38bdf8;text-decoration:none;"><code>' + code + '</code></a></td>' +
+                    '<td style="word-break:break-word;">' + (row.longUrl || '—') + '</td>' +
+                    '<td>' + String(row.redirectCount ?? 0) + '</td>' +
+                    '<td>' + fmtDate(row.createdAt) + '</td>';
+                body.appendChild(tr);
+            }
+        } catch (e) {
+            showError(e.message || 'Failed to load links.');
+            const body = document.getElementById('linksBody');
+            body.innerHTML = '<tr><td colspan="4" class="muted">Unable to load links.</td></tr>';
+        }
+    })();
+</script>
+</body>
+</html>
+
